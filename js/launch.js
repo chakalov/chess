@@ -7,6 +7,9 @@ var Application = {
 	
 	COLOR_BLACK: 0x1F1F1F,
 	COLOR_WHITE: 0xF1F1F1,
+	SPECULAR_BLACK: 0x001122,
+	SPECULAR_WHITE: 0x667788,
+	
 	
 	SQUARE_SIZE: 128,
 	
@@ -36,11 +39,27 @@ var Application = {
 		
 		// create the scene
 		Application.scene = new THREE.Scene();
-		Application.scene.fog = new THREE.FogExp2(0x556677, 0.00000025);
+		Application.scene.fog = new THREE.FogExp2(0x000000, 0.000001);
+		
+		// add lights
+		Application.scene.add(new THREE.AmbientLight(0x000F1F));
+		var spotlight = new THREE.SpotLight(0xFFFFFF, 1);
+		spotlight.position.set(0, 2000, 0);
+		spotlight.angle =  Math.PI / 2;
+		spotlight.exponent = 50.0;
+		spotlight.target.position.set(0, 0, 0);
+		Application.scene.add(spotlight);
+		
+		var whiteLight = new THREE.PointLight(0xFFEEDD, 0.5);
+		whiteLight.position.set(0,1000,512);
+		Application.scene.add(whiteLight);
+		var blackLight = new THREE.PointLight(0xFFEEDD, 0.55);
+		blackLight.position.set(0,1000,-512);
+		Application.scene.add(blackLight);
 		
 		// add invisible plane for intersections
 		Application.plane = new THREE.Mesh(
-			new THREE.PlaneBufferGeometry(2048, 2048, 8, 8),
+			new THREE.PlaneBufferGeometry(4096, 4096, 8, 8),
 			new THREE.MeshBasicMaterial({
 				color: 0x000000,
 				opacity: 0.25,
@@ -71,6 +90,13 @@ var Application = {
 		
 		// add controls
 		Application.controls = new THREE.OrbitControls(Application.camera);
+		Application.controls.minPolarAngle = 0;
+		Application.controls.maxPolarAngle = 85 * Math.PI/180;
+		Application.controls.minDistance   = 500;
+		Application.controls.maxDistance   = 2150;
+		Application.controls.userZoomSpeed = 1.0;
+		Application.controls.noPan = true;
+		Application.goodPolarAngle = 60 * Math.PI/180;
 		
 		// add listeners
 		window.addEventListener('resize', Application.onWindowResize, false);
@@ -84,58 +110,48 @@ var Application = {
 			y: 0
 		};
 		Application.selectedObject = null;
+		Application.oldCoordinates = null;
+		Application.selectedCell = null;
 		
 		// initialize raycaster for mouse coordinates
 		Application.vector = new THREE.Vector3();
 		Application.raycaster = new THREE.Raycaster();
 		
 		/* START INIT OBJECTS */
-		this.chessBoard = new Application.ChessBoard();
-		Application.scene.add(this.chessBoard);
-		
 		this.pieces = [];
 		
 		for (var i = 0; i < 8; i++) {
-			var piece = new Application.ChessPiece(Application.COLOR_WHITE);
+			var piece = new Application.ChessPiece(Application.COLOR_WHITE, Application.SPECULAR_WHITE);
 			piece.position.set(-512 + 64 + i * 128, 50, 512 - 64);
 			Application.scene.add(piece);
 			this.pieces.push(piece);
 		}
 		
 		for (var i = 0; i < 8; i++) {
-			var piece = new Application.ChessPiece(Application.COLOR_WHITE);
+			var piece = new Application.ChessPiece(Application.COLOR_WHITE, Application.SPECULAR_WHITE);
 			piece.position.set(-512 + 64 + i * 128, 50, 384 - 64);
 			Application.scene.add(piece);
 			this.pieces.push(piece);
 		}
 		
 		for (var i = 0; i < 8; i++) {
-			var piece = new Application.ChessPiece(Application.COLOR_BLACK);
+			var piece = new Application.ChessPiece(Application.COLOR_BLACK, Application.SPECULAR_BLACK);
 			piece.position.set(384 + 64 - i * 128, 50, -384 - 64);
 			Application.scene.add(piece);
 			this.pieces.push(piece);
 		}
 		
 		for (var i = 0; i < 8; i++) {
-			var piece = new Application.ChessPiece(Application.COLOR_BLACK);
+			var piece = new Application.ChessPiece(Application.COLOR_BLACK, Application.SPECULAR_BLACK);
 			piece.position.set(384 + 64 - i * 128, 50, -256 - 64);
 			Application.scene.add(piece);
 			this.pieces.push(piece);
 		}
 		
-		var spriteMaterial = new THREE.SpriteMaterial({ 
-			map: new THREE.ImageUtils.loadTexture('textures/arrow.png'),
-			color: 0xFF0000,
-			transparent: false,
-			blending: THREE.AdditiveBlending
-		});
-		Application.sprite = new THREE.Sprite(spriteMaterial);
-		Application.sprite.scale.set(200, 200, 1.0);
-		Application.sprite.visible = false;
-		Application.scene.add(Application.sprite);
-		
 		// add droppoints
 		this.dropPoints = [];
+		this.cells = [];
+		var n = 0;
 		for (var i = 0; i < 8; i++) {
 			for (var j = 0; j < 8; j++) {
 				var dropPoint = new Application.DropPoint();
@@ -143,7 +159,20 @@ var Application = {
 				Application.scene.add(dropPoint);
 				dropPoint.visible = false;
 				this.dropPoints.push(dropPoint);
+				
+				var cell;
+				if (n % 2 == 0) {
+					cell = new Application.BlackCell();
+				} else {
+					cell = new Application.WhiteCell();
+				}
+				n++;
+				
+				cell.position.set(-512 + 64 + i * 128, 0, 512 - 64 - j * 128);
+				Application.scene.add(cell);
+				this.cells.push(cell);
 			}
+			n++;
 		}
 		/* END INIT OBJECTS */
 	},
@@ -176,17 +205,23 @@ var Application = {
 		Application.mouseState &= ~Application.MOUSE_STATES.BUTTON_PRESSED;
 		event.preventDefault();
 		
-		Application.vector.set(Application.mouse.x, Application.mouse.y, 1);
-		Application.vector.unproject(Application.camera);
-		Application.raycaster.set(Application.camera.position, Application.vector.sub(Application.camera.position).normalize());
-		var intersects = Application.raycaster.intersectObjects(Application.dropPoints);
-		
-		if (intersects.length > 0) {
-			Application.selectedObject.position.copy(intersects[0].object.position);
-		} else {
-			// return old coordinates
+		if (Application.selectedObject) {
+			Application.vector.set(Application.mouse.x, Application.mouse.y, 1);
+			Application.vector.unproject(Application.camera);
+			Application.raycaster.set(Application.camera.position, Application.vector.sub(Application.camera.position).normalize());
+			var intersects = Application.raycaster.intersectObjects(Application.dropPoints);
+			
+			if (intersects.length > 0) {
+				Application.selectedObject.position.copy(intersects[0].object.position);
+			} else {
+				// restore old coordinates
+				Application.selectedObject.position.copy(Application.oldCoordinates);
+			}
 		}
-		Application.sprite.visible = false;
+		
+		if (Application.selectedCell) {
+			Application.selectedCell.material.color.setHex(Application.selectedCell.currentHex);
+		}
 		
 		Application.controls.enabled = true;
 	},
@@ -216,21 +251,34 @@ var Application = {
 				if (intersects.length > 0) {
 					Application.selectedObject.position.copy(intersects[0].point);
 				} else {
-					// return old coordinates...
+					// restore old coordinates
+					Application.selectedObject.position.copy(Application.oldCoordinates);
 				}
 				
 				intersects = Application.raycaster.intersectObjects(Application.dropPoints);
 				if (intersects.length > 0) {
-					Application.sprite.position.copy(intersects[0].object.position);
-					Application.sprite.visible = true;
-				} else {
-					Application.sprite.visible = false;
+					Application.raycaster.set(intersects[0].object.position, new THREE.Vector3(0, -1, 0));
+					
+					// mark the cell
+					intersects = Application.raycaster.intersectObjects(Application.cells);
+					if (intersects.length > 0) {
+						if (Application.selectedCell != intersects[0].object) {
+							if (Application.selectedCell) {
+								Application.selectedCell.material.color.setHex(Application.selectedCell.currentHex);
+							}
+							// mark the cell as selected
+							Application.selectedCell = intersects[0].object;
+							Application.selectedCell.currentHex = Application.selectedCell.material.color.getHex();
+							Application.selectedCell.material.color.setHex(0x4FCC55);
+						}
+					} else {
+						Application.selectedCell.material.color.setHex(Application.selectedCell.currentHex);
+					}
 				}
 			}
 		} else {
-			// TODO: fix camera position
-			if (Application.camera.position.y < 1000) {
-				Application.camera.position.y += Math.abs(1000 - Application.camera.position.y) / 20 + 1;
+			if (Application.controls.getPolarAngle() > Application.goodPolarAngle) {
+				Application.controls.rotateUp((Application.controls.getPolarAngle() - Application.goodPolarAngle) / 20 + 0.001);
 				return;
 			}
 			
@@ -241,9 +289,15 @@ var Application = {
 					if (Application.selectedObject) {
 						Application.selectedObject.material.color.setHex(Application.selectedObject.currentHex);
 					}
+					
+					// mark the object as selected
 					Application.selectedObject = intersects[0].object;
+					
+					// save the old coordinates
+					Application.oldCoordinates = Application.selectedObject.position.clone();
+					
 					Application.selectedObject.currentHex = Application.selectedObject.material.color.getHex();
-					Application.selectedObject.material.color.setHex(0xffff00);
+					Application.selectedObject.material.color.setHex(0x00ff00);
 				}
 			} else {
 				if (Application.selectedObject) { 
@@ -259,43 +313,53 @@ var Application = {
 	}
 };
 
-Application.ChessBoard = function () {
-	this.texture = 'textures/chessboard.jpg';
-	this.repeatX = 2;
-	this.repeatY = 2;
+Application.Cell = function (texture, specular, shininess) {
+	this.width = 128;
+	this.height = 128;
+	this.texture = texture;
+	this.specular = specular;
+	this.shininess = shininess;
 	
-	this.width = 1024;
-	this.height = 1024;
+	var cellTexture = new THREE.ImageUtils.loadTexture(this.texture);
 	
-	var floorTexture = new THREE.ImageUtils.loadTexture(this.texture);
+	var cellGeometry = new THREE.PlaneBufferGeometry(this.width, this.height);
 	
-	floorTexture.wrapS = floorTexture.wrapT = THREE.RepeatWrapping; 
-	floorTexture.repeat.set(this.repeatX, this.repeatY);
-	
-	var floorMaterial = new THREE.MeshBasicMaterial({
-		map: floorTexture
+	var cellMaterial = new THREE.MeshPhongMaterial({
+		map: cellTexture,
+		specular: this.specular,
+		shininess: this.shininess
 	});
 	
-	var floorGeometry = new THREE.PlaneBufferGeometry(this.width, this.height);
+	THREE.Mesh.call(this, cellGeometry, cellMaterial);
 	
-	THREE.Mesh.call(this, floorGeometry, floorMaterial);
-	
-	this.position.y = -1;
+	this.position.y = 5;
 	this.rotation.x = -Math.PI / 2;
-};
+}
+Application.Cell.prototype = Object.create(THREE.Mesh.prototype);
 
-Application.ChessBoard.prototype = Object.create(THREE.Mesh.prototype);
+Application.WhiteCell = function () {
+	Application.Cell.call(this, 'textures/cell-w.png', Application.SPECULAR_BLACK, 0);
+}
+Application.WhiteCell.prototype = Object.create(Application.Cell.prototype);
 
-Application.ChessPiece = function (color) {
+Application.BlackCell = function () {
+	Application.Cell.call(this, 'textures/cell-b.png', Application.SPECULAR_BLACK, 30.0);
+}
+Application.BlackCell.prototype = Object.create(Application.Cell.prototype);
+
+Application.ChessPiece = function (color, specular) {
 	this.width = 100;
 	this.height = 100;
 	this.depth = 100;
 	
 	this.color = color;
+	this.specular = specular;
 	
 	var cubeGeometry = new THREE.BoxGeometry(this.width, this.height, this.depth);
-	var cubeMaterial = new THREE.MeshBasicMaterial({
-		color: this.color
+	var cubeMaterial = new THREE.MeshPhongMaterial({
+		color: this.color,
+		specular: this.specular,
+		shininess: 30
 	});
 	
 	THREE.Mesh.call(this, cubeGeometry, cubeMaterial);
@@ -307,13 +371,13 @@ Application.DropPoint = function () {
 	this.width = 128;
 	this.height = 128;
 	
-	var circleGeometry = new THREE.PlaneBufferGeometry(this.width, this.height);
+	var squareGeometry = new THREE.PlaneBufferGeometry(this.width, this.height);
 	
-	var circleMaterial = new THREE.LineBasicMaterial({
+	var squareMaterial = new THREE.LineBasicMaterial({
 		color: 0xE0F0FF
 	});
 					
-	THREE.Mesh.call(this, circleGeometry, circleMaterial);
+	THREE.Mesh.call(this, squareGeometry, squareMaterial);
 	
 	this.position.y = 5;
 	this.rotation.x = -Math.PI / 2;
