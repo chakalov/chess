@@ -470,7 +470,7 @@ var Application = {
 			if (intersects.length > 0) {
 				if (intersects[0].object != Application.selectedObject) {
 					if (Application.selectedObject) {
-						Application.selectedObject.material.color.setHex(Application.selectedObject.currentHex);
+						Application.selectedObject.material.emissive.setHex(Application.selectedObject.currentHex);
 					}
 
 					// mark the object as selected
@@ -479,12 +479,12 @@ var Application = {
 					// save the old coordinates
 					Application.oldCoordinates = Application.selectedObject.position.clone();
 
-					Application.selectedObject.currentHex = Application.selectedObject.material.color.getHex();
-					Application.selectedObject.material.color.setHex(0x330000);
+					Application.selectedObject.currentHex = Application.selectedObject.material.emissive.getHex();
+					Application.selectedObject.material.emissive.setHex(0x990000);
 				}
 			} else {
 				if (Application.selectedObject) {
-					Application.selectedObject.material.color.setHex(Application.selectedObject.currentHex);
+					Application.selectedObject.material.emissive.setHex(Application.selectedObject.currentHex);
 				}
 				Application.selectedObject = null;
 			}
