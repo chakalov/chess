@@ -6,14 +6,16 @@
 		</style>
 	</head>
 	<body>
-		<script src="js/three.min.js"></script>
+		<!-- three.js libs -->
+		<script src="js/three.js"></script>
 		<script src="js/libs/stats.min.js"></script>
 		<script src="js/controls/OrbitControls.js"></script>
-		<script src="js/launch.js"></script>
-		
+		<!-- game libs -->
+		<script src="js/app.js"></script>
+		<script src="js/app/loader.js"></script>
+		<script src="js/app/chess.js"></script>
 		<script>
-			Application.init(document.body);
-			Application.animate();
+			Application.run(document.body);
 		</script>
 	</body>
 </html>
