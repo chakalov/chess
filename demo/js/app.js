@@ -92,22 +92,26 @@ var Application = {
 			})
 		);
 		Application.plane.visible = false;
-		Application.plane.position.y = 200;
+		Application.plane.position.y = 120;
 		Application.plane.rotation.x = -Math.PI / 2;
 		Application.scene.add(Application.plane);
 
+		var floorGeometry = new THREE.PlaneBufferGeometry(20000, 20000);
+		floorGeometry.computeVertexNormals();
+
 		var floor = new THREE.Mesh(
-			new THREE.PlaneBufferGeometry(20000, 20000),
-			new THREE.MeshPhongMaterial({
+			floorGeometry,
+			new THREE.MeshNormalMaterial({
 				color: 0x006600,
-				ambient: 0xffffff,
-				specular: 0x050505
+				side: THREE.DoubleSide
+				//emissive: 0x003300,
+				//vertexColors: THREE.FaceColors
 			})
 		);
 
 		floor.rotation.x = -Math.PI / 2;
 		floor.position.y = -20
-		Application.scene.add(floor);
+		//Application.scene.add(floor);
 
 		//var geometry = new THREE.BoxGeometry(1152, 32, 64);
 		//var material = new THREE.MeshBasicMaterial({
@@ -130,8 +134,6 @@ var Application = {
 			bevelEnabled: false,
 			steps: 2
 		});
-
-		var tiling = 6;
 		var wood = Application.Loader.textures['textures/wood-0.jpg'];
 		var spec = Application.Loader.textures['textures/wood_S.jpg'];
 		var norm = Application.Loader.textures['textures/wood_N.jpg'];
@@ -398,7 +400,6 @@ var Application = {
 				// restore old coordinates
 				Application.selectedObject.position.copy(Application.oldCoordinates);
 			}
-			Application.selectedObject.rotation.x = 0;
 		}
 
 		if (Application.selectedCell) {
@@ -432,7 +433,6 @@ var Application = {
 				var intersects = Application.raycaster.intersectObject(Application.plane);
 				if (intersects.length > 0) {
 					Application.selectedObject.position.copy(intersects[0].point);
-					Application.selectedObject.rotation.x = -Math.PI / 12;
 				} else {
 					// restore old coordinates
 					Application.selectedObject.position.copy(Application.oldCoordinates);
@@ -470,7 +470,7 @@ var Application = {
 			if (intersects.length > 0) {
 				if (intersects[0].object != Application.selectedObject) {
 					if (Application.selectedObject) {
-						Application.selectedObject.material.color.setHex(Application.selectedObject.currentHex);
+						Application.selectedObject.material.emissive.setHex(Application.selectedObject.currentHex);
 					}
 
 					// mark the object as selected
@@ -479,12 +479,12 @@ var Application = {
 					// save the old coordinates
 					Application.oldCoordinates = Application.selectedObject.position.clone();
 
-					Application.selectedObject.currentHex = Application.selectedObject.material.color.getHex();
-					Application.selectedObject.material.color.setHex(0x00ff00);
+					Application.selectedObject.currentHex = Application.selectedObject.material.emissive.getHex();
+					Application.selectedObject.material.emissive.setHex(0xCC0000);
 				}
 			} else {
 				if (Application.selectedObject) {
-					Application.selectedObject.material.color.setHex(Application.selectedObject.currentHex);
+					Application.selectedObject.material.emissive.setHex(Application.selectedObject.currentHex);
 				}
 				Application.selectedObject = null;
 			}
