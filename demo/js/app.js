@@ -389,6 +389,8 @@ var Application = {
 			event.preventDefault();
 			Application.controls.enabled = false;
             
+            Application.selectedCell = null;
+            
             // mark all possible moves
             for (var i = 0; i < validMoves.length; i++) {
                 if ((validMoves[i] & 0xFF) == MakeSquare(Application.selectedObject.posY, Application.selectedObject.posX)) {
@@ -419,7 +421,10 @@ var Application = {
 				Application.selectedObject.position.y = 0;
                 
                 // play the move
-                Application.playMove(Application.selectedObject, Application.selectedCell);
+                if (!Application.playMove(Application.selectedObject, Application.selectedCell)) {
+                    // restore old coordinates
+                    Application.selectedObject.position.copy(Application.oldCoordinates);
+                }
 			} else {
 				// restore old coordinates
 				Application.selectedObject.position.copy(Application.oldCoordinates);
