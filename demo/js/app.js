@@ -63,8 +63,7 @@ var Application = {
 
 		// initialize the camera
 		Application.camera = new THREE.PerspectiveCamera(Application.VIEW_ANGLE, Application.WIDTH / Application.HEIGHT, Application.NEAR, Application.FAR);
-		Application.camera.position.set(0, 0, -1500);
-        //Application.camera.
+		Application.camera.position.set(1500, 0, 0);
 
 		// create the scene
 		Application.scene = new THREE.Scene();
@@ -252,32 +251,32 @@ var Application = {
     UpdatePieces: function () {
         for (var y = 0; y < 8; y++) {
 			for (var x = 0; x < 8; x++) {
-                var piece = g_board[MakeSquare(y,x)];
+                var piece = g_board[MakeSquare(y, x)];
 				var pieceColor = (piece & colorWhite) ? 'W' : 'B';
 				var pieceName = null;
 				switch (piece & 0x7) {
-				case piecePawn:
-					pieceName = "pawn";
-					break;
-				case pieceKnight:
-					pieceName = "knight";
-					break;
-				case pieceBishop:
-					pieceName = "bishop";
-					break;
-				case pieceRook:
-					pieceName = "rook";
-					break;
-				case pieceQueen:
-					pieceName = "queen";
-					break;
-				case pieceKing:
-					pieceName = "king";
-					break;
+                    case piecePawn:
+                        pieceName = "pawn";
+                        break;
+                    case pieceKnight:
+                        pieceName = "knight";
+                        break;
+                    case pieceBishop:
+                        pieceName = "bishop";
+                        break;
+                    case pieceRook:
+                        pieceName = "rook";
+                        break;
+                    case pieceQueen:
+                        pieceName = "queen";
+                        break;
+                    case pieceKing:
+                        pieceName = "king";
+                        break;
 				}
                 
                 if (pieceName) {
-                    Application.addPiece(x, y, pieceName, pieceColor);
+                    Application.addPiece(y, x, pieceName, pieceColor);
                 }
             }
         }
@@ -288,15 +287,15 @@ var Application = {
         console.log(fen);
     },
     
-    addPiece: function (x, y, pieceType, pieceColor) {
-        if (pieceColor == "W") {
+    addPiece: function (r, c, pieceType, pieceColor) {
+        if (pieceColor == 'W') {
             var piece = new Application.ChessPiece(pieceType, Application.COLOR_WHITE, Application.SPECULAR_WHITE);
         } else {
             var piece = new Application.ChessPiece(pieceType, Application.COLOR_BLACK, Application.SPECULAR_BLACK);
         }
         
-        var cell = Application.Chessboard.configuration[x][y].cell.position;
-        piece.setPositionOnBoard(x, y);
+        var cell = Application.Chessboard.configuration[r][c].cell.position;
+        piece.setPositionOnBoard(r, c);
 		piece.position.set(cell.x, 0, cell.z);
 		Application.scene.add(piece);
 		this.pieces.push(piece);
@@ -307,16 +306,16 @@ var Application = {
 			return false;
 		}
 
-		var startSquare = MakeSquare(piece.posY, piece.posX);
-		var endSquare   = MakeSquare(cell.chessY, cell.chessX);
+		var startSquare = MakeSquare(piece.row, piece.col);
+		var endSquare   = MakeSquare(cell.row, cell.col);
 
 		var move = null;
 		var testPromotion = false;
 		var p = g_board[startSquare];
 
 		if ( ((p & 0x7) === piecePawn) &&
-				(((piece.posY === 1) && g_playerWhite) ||
-				( (piece.posY === 6) && !g_playerWhite)) &&
+				(((piece.row === 1) && g_playerWhite) ||
+				( (piece.row === 6) && !g_playerWhite)) &&
 				(((p & 0x8) &&  g_playerWhite) ||
 				(!(p & 0x8) && !g_playerWhite))
 			) {
@@ -348,7 +347,7 @@ var Application = {
 		}
 
 
-		if (!(piece.posX === cell.chessX && piece.posY === cell.chessY) && move !== null) {
+		if (!(piece.col === cell.col && piece.row === cell.row) && move !== null) {
 
 			// we send the move to our worker
 			if (InitializeBackgroundEngine()) {
@@ -393,11 +392,11 @@ var Application = {
             
             // mark all possible moves
             for (var i = 0; i < validMoves.length; i++) {
-                if ((validMoves[i] & 0xFF) == MakeSquare(Application.selectedObject.posY, Application.selectedObject.posX)) {
+                if ((validMoves[i] & 0xFF) == MakeSquare(Application.selectedObject.row, Application.selectedObject.col)) {
                     for (var y = 0; y < 8; y++) {
                         for (var x = 0; x < 8; x++) {
                             if (((validMoves[i] >> 8) & 0xFF) == MakeSquare(y, x)) {
-                                Application.Chessboard.configuration[x][y].cell.material.color.setHex(0x007700);
+                                Application.Chessboard.configuration[y][x].cell.material.color.setHex(0x007700);
                             }
                         }
                     }
@@ -486,7 +485,7 @@ var Application = {
 							Application.selectedCell = intersects[0].object;
 							Application.selectedCell.currentHex = Application.selectedCell.material.color.getHex();
                             // mark the cells (valid or unvalid), exclude the start cell
-                            if (Application.selectedCell.chessX != Application.selectedObject.posX || Application.selectedCell.chessY != Application.selectedObject.posY) {
+                            if (Application.selectedCell.col != Application.selectedObject.col || Application.selectedCell.row != Application.selectedObject.row) {
                                 if (Application.selectedCell.currentHex != 0x007700) {
                                     Application.selectedCell.material.color.setHex(0xFF0000);
                                 } else {
